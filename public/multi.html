@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Парная игра</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            text-align: center;
+        }
+        #link {
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #waiting, #game, #results {
+            display: none;
+        }
+        #panorama {
+            width: 80%;
+            height: 500px;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+        #map {
+            width: 300px;
+            height: 300px;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div id="initial">
+        <h1>Парная игра</h1>
+        <p>Отправьте эту ссылку другу, чтобы он подключился:</p>
+        <div id="link"></div>
+        <button onclick="startGame()">Начать игру</button>
+    </div>
+    <div id="waiting">
+        <h2>Ожидание второго игрока...</h2>
+    </div>
+    <div id="game">
+        <div id="panorama"></div>
+        <div id="map"></div>
+        <button onclick="submitGuess()">Сделать выбор</button>
+    </div>
+    <div id="results">
+        <h2>Результаты</h2>
+        <p>Ваша ошибка: <span id="yourDistance"></span> км</p>
+        <p>Ошибка соперника: <span id="opponentDistance"></span> км</p>
+        <button onclick="playAgain()">Играть еще раз</button>
+        <button onclick="goHome()">На главную</button>
+    </div>
+
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+	<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGbr_QILBhKjlGn5KywwhRM4qZEYR3vXk&callback=initMap&v=weekly" defer></script>
+    
+    <script>
+        let ws, panorama, map, marker, realLocation, roomId, playerId;
+
+        function generateRoomId() {
+            return 'xxxx-xxxx-xxxx'.replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
+        }
+
+        window.onload = () => {
+            roomId = new URLSearchParams(window.location.search).get('room') || generateRoomId();
+            document.getElementById("link").textContent = window.location.origin + '/multi.html?room=' + roomId;
+
+            ws = new WebSocket(`ws://localhost:3000`); // Замени на адрес твоего сервера
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({
+                    type: 'joinRoom',
+                    roomId: roomId
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+        };
+
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'roomJoined':
+                    playerId = data.playerId;
+                    if (data.totalPlayers === 2) {
+                        document.getElementById("initial").style.display = "none";
+                        document.getElementById("waiting").style.display = "none";
+                        document.getElementById("game").style.display = "block";
+                        initMap();
+                    } else {
+                        document.getElementById("initial").style.display = "none";
+                        document.getElementById("waiting").style.display = "block";
+                    }
+                    break;
+                case 'gameReady':
+                    document.getElementById("waiting").style.display = "none";
+                    document.getElementById("game").style.display = "block";
+                    initMap();
+                    break;
+                case 'panoramaSet':
+                    realLocation = data.panorama;
+                    panorama.setPosition(realLocation);
+                    map.setCenter(realLocation);
+                    marker.setPosition(realLocation);
+                    break;
+                case 'results':
+                    showResults(data.results);
+                    break;
+                case 'playerLeft':
+                    alert("Соперник отключился. Игра окончена.");
+                    goHome();
+                    break;
+            }
+        }
+
+        function initMap() {
+            panorama = new google.maps.StreetViewPanorama(
+                document.getElementById("panorama"), {
+                    position: { lat: 0, lng: 0 },
+                    pov: { heading: 165, pitch: 0 },
+                    zoom: 1
+                });
+
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 0, lng: 0 },
+                zoom: 2
+            });
+
+            marker = new google.maps.Marker({
+                map: map,
+                draggable: true,
+                position: { lat: 0, lng: 0 }
+            });
+
+            map.addListener("click", (event) => {
+                marker.setPosition(event.latLng);
+            });
+        }
+
+        function startGame() {
+            ws.send(JSON.stringify({
+                type: 'startGame',
+                roomId: roomId
+            }));
+        }
+
+        function submitGuess() {
+            const guess = marker.getPosition().toJSON();
+            ws.send(JSON.stringify({
+                type: 'submitGuess',
+                roomId: roomId,
+                playerId: playerId,
+                guess: guess
+            }));
+            document.getElementById("game").style.display = "none";
+            document.getElementById("waiting").style.display = "block";
+        }
+
+        function showResults(results) {
+            document.getElementById("waiting").style.display = "none";
+            document.getElementById("results").style.display = "block";
+            document.getElementById("yourDistance").textContent = results[playerId].toFixed(2);
+            for (let otherPlayer in results) {
+                if (otherPlayer !== playerId) {
+                    document.getElementById("opponentDistance").textContent = results[otherPlayer].toFixed(2);
+                }
+            }
+        }
+
+        function playAgain() {
+            document.getElementById("results").style.display = "none";
+            document.getElementById("game").style.display = "block";
+            ws.send(JSON.stringify({
+                type: 'startGame',
+                roomId: roomId
+            }));
+        }
+
+        function goHome() {
+            window.location.href = "index.html";
+        }
+    </script>
+</body>
+</html>

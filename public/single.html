@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Одиночная игра</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #panorama {
+            width: 80%;
+            height: 500px;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+        #map {
+            width: 300px;
+            height: 300px;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            border: 1px solid #ccc;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="panorama"></div>
+    <div id="map"></div>
+    <button onclick="submitGuess()">Сделать выбор</button>
+    <div id="popup">
+        <h2>Результат</h2>
+        <p>Ваша ошибка: <span id="distance"></span> км</p>
+        <button onclick="playAgain()">Играть еще раз</button>
+        <button onclick="goHome()">На главную</button>
+    </div>
+
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGbr_QILBhKjlGn5KywwhRM4qZEYR3vXk&callback=initMap&v=weekly" defer></script>
+    <script>
+        let panorama, map, marker, realLocation;
+
+        function initMap() {
+            // Инициализация панорамы
+            panorama = new google.maps.StreetViewPanorama(
+                document.getElementById("panorama"), {
+                    position: { lat: 0, lng: 0 },
+                    pov: { heading: 165, pitch: 0 },
+                    zoom: 1
+                });
+
+            // Случайная панорама
+            fetchRandomPanorama();
+
+            // Инициализация карты
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: 0, lng: 0 },
+                zoom: 2
+            });
+
+            // Добавление маркера
+            marker = new google.maps.Marker({
+                map: map,
+                draggable: true,
+                position: { lat: 0, lng: 0 }
+            });
+
+            map.addListener("click", (event) => {
+                marker.setPosition(event.latLng);
+            });
+        }
+
+        function fetchRandomPanorama() {
+            // Здесь должна быть логика для получения случайной панорамы Google Street View
+            // Это упрощенный пример, реальный API требует настройки
+            const locations = [
+                { lat: 51.505, lng: -0.09 }, // Лондон
+                { lat: 48.8566, lng: 2.3522 }, // Париж
+                { lat: 35.6762, lng: 139.6503 } // Токио
+            ];
+            const randomLoc = locations[Math.floor(Math.random() * locations.length)];
+            realLocation = randomLoc;
+            panorama.setPosition(randomLoc);
+            map.setCenter(randomLoc);
+            marker.setPosition(randomLoc);
+        }
+
+        function submitGuess() {
+            const guess = marker.getPosition();
+            const distance = calculateDistance(guess.lat(), guess.lng(), realLocation.lat, realLocation.lng);
+            document.getElementById("distance").textContent = distance.toFixed(2);
+            document.getElementById("popup").style.display = "block";
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Радиус Земли в км
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function playAgain() {
+            fetchRandomPanorama();
+            document.getElementById("popup").style.display = "none";
+        }
+
+        function goHome() {
+            window.location.href = "index.html";
+        }
+    </script>
+</body>
+</html>
