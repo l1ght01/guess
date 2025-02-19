@@ -1,12 +1,15 @@
 {
   "name": "guess-location-game",
   "version": "1.0.0",
+  "description": "A real-time multiplayer location guessing game using Node.js, Express, and WebSocket",
   "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "express": "^4.17.1",
     "ws": "^8.0.0"
   },
-  "scripts": {
-    "start": "node server.js"
-  }
+  "author": "l1ght01",
+  "license": "MIT"
 }
